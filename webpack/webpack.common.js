@@ -111,9 +111,6 @@ module.exports = (env, argv) => {
                         {
                             loader: 'ts-loader',
                             options: {
-                                getCustomTransformers: program => ({
-                                    before: [DescriptionTransformerFactory()]
-                                })
                             }
                         }
                     ],
@@ -145,6 +142,32 @@ module.exports = (env, argv) => {
                         'file-loader',
                         'extract-loader',
                         'css-loader',
+                    ],
+                },
+                {
+                    test: /\.scss$/,
+                    use: [
+                        {
+                            loader: 'style-loader',
+                            options: {
+                                injectType: 'linkTag',
+                                attributes: {
+                                    'data-description': `Styles for IQNOX widget ${packageName}`,
+                                },
+                            },
+                        },
+                        {
+                            loader: 'file-loader',
+                            options: {
+                                name: '[path][name].css',
+                            },
+                        },
+                        'extract-loader',
+                        'css-loader',
+                        {
+                            loader: 'sass-loader',
+                            options: {},
+                        },
                     ],
                 },
             ],

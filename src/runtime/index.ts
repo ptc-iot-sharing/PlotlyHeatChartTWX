@@ -5,62 +5,132 @@ import {
     TWEvent,
     event,
     service,
+    didBind,
 } from 'typescriptwebpacksupport/widgetRuntimeSupport';
+import * as Plotly from 'plotly.js/dist/plotly';
+import 'plotly.js/src/css/style.scss';
+
+
 
 /**
- * The `@TWWidgetDefinition` decorator marks a class as a Thingworx widget. It can only be applied to classes
- * that inherit from the `TWRuntimeWidget` class.
+ * A 2D heat chart that uses the plotly library.
  */
 @TWWidgetDefinition
-class DemoWebpackWidget extends TWRuntimeWidget {
-    /**
-     * The `@event` decorator can be applied to class member to mark them as events.
-     * They must have the `TWEvent` type and can be invoked to trigger the associated event.
-     *
-     * Optionally, the decorator can receive the name of the event as its parameter; if it is not specified,
-     * the name of the event will be considered to be the same as the name of the class member.
-     */
-    @event clicked: TWEvent;
+class PlotlyHeatChart extends TWRuntimeWidget {
 
     /**
-     * The `@property` decorator can be applied to class member to mark them as events.
-     * The value of the class member and of the associated widget property will be kept in sync.
-     *
-     * The runtime will also automatically update the value of the property for bindings; because of this
-     * the `updateProperty` method becomes optional. If `updateProperty` is overriden, you must invoke
-     * the superclass implementation to ensure that decorated properties are updated correctly.
-     *
-     * Optionally, the decorator can receive a number of aspects as its parameters.
+     * The field to use for the X axis values.
      */
-    @property clickMessage: string;
+    @property xField: string;
 
     /**
-     * The `canBind` and `didBind` aspects can be used to specify callback methods to execute when the value of
-     * the property is about to be updated or has been updated because of a binding.
-     *
-     * For `canBind`, the method can decide to reject the newly received value.
+     * The field to use for the Y axis values. 
      */
-    @property(canBind('valueWillBind')) set value(value: string) {
-        this.internalLogic.createDataElement(this.jqElement[0], value);
-    }
+    @property yField: string;
 
     /**
-     * Optionally, the first parameter of the `@property` decorator can be a string that specifies the
-     * name of the property as it is defined in the IDE class. This can be used to have different names
-     * in the definition and implementation.
+     * The field to use for the Z axis values. 
      */
-    @property('clickedAmount') timesClicked: number;
+    @property zField: string;
 
     /**
-     * This method is invoked whenever the `value` property is about to be updated because of a binding,
-     * because it has been specified in the `canBind` aspect of the `value` property.
-     * @param value         Represents the property's new value.
-     * @param info          The complete updatePropertyInfo object.
-     * @return              `true` if the property should update to the new value, `false` otherwise.
+     * If enabled, rows for the same X and Y coordinates will be summed up. If disabled, subsequent values will ovewrite the previous values.
      */
-    valueWillBind(value: string, info: TWUpdatePropertyInfo): boolean {
-        alert(`Value will be updated to ${value}`);
-        return true;
+    @property mergeOverlappingValues: boolean;
+
+    /**
+     * The minimum value for the Z axis.
+     */
+    zMin: number;
+
+    /**
+     * The maximum value for the Z axis.
+     */
+    zMax: number;
+
+    /**
+     * The data source used by plotly.
+     */
+    matrix: number[][];
+
+    /**
+     * The raw data source used by the widget.
+     */
+    @property set data(data: TWInfotable) {
+        const x = this.xField;
+        const y = this.yField;
+        const z = this.zField;
+
+        let zMin = Number.POSITIVE_INFINITY, zMax = Number.NEGATIVE_INFINITY;
+
+        const mergeOverlappingValues = this.mergeOverlappingValues;
+
+        // These maps contain the possible values for the X and Y axes as keys.
+        // Their values represent the mapping between the label and the corresponding matrix index.
+        let yValues: Dictionary<number> = {};
+        let xValues: Dictionary<number> = {};
+
+        let xRange = 0;
+        let yRange = 0;
+
+        // Determine the minimum and maximum values for the Z values.
+        // Also detemine the number of values available for the X and Y fields, based on these ranges the size of the matrix may be determined
+        for (const row of data.rows) {
+            const xValue = row[x];
+            const yValue = row[y];
+            const zValue = row[z] as number;
+
+            if (zMin > zValue) {
+                zMin = zValue;
+            }
+
+            if (zMax < zValue) {
+                zMax = zValue;
+            }
+
+            if (!(xValue in xValues)) {
+                xValues[xValue] = xRange;
+                xRange += 1;
+            }
+
+            if (!(yValue in yValues)) {
+                yValues[yValue] = yRange;
+                yRange += 1;
+            }
+        }
+
+        // Construct the 2D matrix to be used by plotly
+        const matrix = Array(yRange);
+        for (let i = 0; i < yRange; i++) {
+            matrix[i] = Array(xRange);
+        }
+
+        // Traverse the data source again to fill out the matrix
+        for (const row of data.rows) {
+            const xValue = row[x];
+            const yValue = row[y];
+            const zValue = row[z] as number;
+
+            if (mergeOverlappingValues) {
+                matrix[yValues[yValue]][xValues[xValue]] = (matrix[yValues[yValue]][xValues[xValue]] || 0) + zValue;
+            }
+            else {
+                matrix[yValues[yValue]][xValues[xValue]] = zValue;
+            }
+        }
+
+        // Draw the plot
+        Plotly.newPlot(this.jqElement[0], [{
+            // Insertion order is not guaranteed for number-convertible keys, so the insertion order must be specified manually
+            x: Object.keys(xValues).sort((x1, x2) => xValues[x1] - xValues[x2]),
+            y: Object.keys(yValues).sort((y1, y2) => yValues[y1] - yValues[y2]),
+            z: matrix,
+            type: 'heatmap',
+            colorscale: 'Turbo',
+        }]);
+
+        this.matrix = matrix;
+
     }
 
     /**
@@ -68,34 +138,23 @@ class DemoWebpackWidget extends TWRuntimeWidget {
      * @return      The HTML structure.
      */
     renderHtml(): string {
-        return `<div class="widget-content widget-demo">${this.value}</div>`;
+        return `<div class="widget-content widget-demo"></div>`;
     }
-
-    internalLogic;
 
     /**
      * Invoked after the widget's HTML element has been created.
      * The `jqElement` property will reference the correct element within this method.
      */
     async afterRender(): Promise<void> {
-        this.internalLogic = await import('../common/internalLogic');
-        this.jqElement[0].addEventListener('click', (event: MouseEvent): void => {
-            this.timesClicked++;
-            this.clicked();
-            event.stopPropagation();
-        });
     }
 
     /**
-     * The `@service` decorator can be applied to methods to mark them as events.
-     *
-     * The runtime will also automatically call the method when the associated service is invoked.
-     *
-     * Optionally, the decorator can receive the name of the service as its parameter; if it is not specified,
-     * the name of the service will be considered to be the same as the name of the method.
+     * Invoked by the runtime whenever this widget is resized.
+     * @param width     The new width.
+     * @param height    The new height.
      */
-    @service testService(): void {
-        alert(this.clickMessage);
+    resize(width: number, height: number) {
+        if (this.matrix) Plotly.relayout(this.jqElement[0], {width, height});
     }
 
     /**

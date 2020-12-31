@@ -1,0 +1,11 @@
+@import "../../node_modules/plotly.js/src/css/_vars.scss";
+
+.js-plotly-plot .plotly {
+    @import "../../node_modules/plotly.js/src/css/_mixins.scss";
+    @import "../../node_modules/plotly.js/src/css/_base.scss";
+    @import "../../node_modules/plotly.js/src/css/_cursor.scss";
+    @import "../../node_modules/plotly.js/src/css/_modebar.scss";
+    @import "../../node_modules/plotly.js/src/css/_tooltip.scss";
+    @import "../../node_modules/plotly.js/src/css/_drag.scss";
+}
+@import "../../node_modules/plotly.js/src/css/_notifier.scss";
