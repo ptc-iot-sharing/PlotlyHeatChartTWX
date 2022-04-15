@@ -107,3 +107,5 @@ The repository should have one protected branch:
 * **master**: This is where the main development takes place. Each push to master is automatically built by the CI/CD pipeline and artifacts are generated.
 
 By default, this repository comes with two samples CI/CD configurations for both GitHub and GitLab. By default, the `.releaserc.json` triggers a GitHub release. If you want to use GitLab, rename `.releaserc-gitlab.json` to `.releaserc.json`.
+
+#This Extension is provided as-is and without warranty or support. It is not part of the PTC product suite.#
